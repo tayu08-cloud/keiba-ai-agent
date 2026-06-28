@@ -48,4 +48,8 @@
 
 - 予測結果 CSV から Markdown レポートを生成
   - `\.\.venv\Scripts\python.exe -c "from keiba_ai_agent.report import ReportBuilder; ReportBuilder(output_dir='reports').build_from_predictions('predictions.csv')"`
+
+- Markdown レポートをメール送信
+  - `\.\.venv\Scripts\python.exe -m keiba_ai_agent.mail.send_report reports/20250628-01.md to@example.com --subject "競馬予想レポート"`
+
 詳細は [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) を参照してください。
