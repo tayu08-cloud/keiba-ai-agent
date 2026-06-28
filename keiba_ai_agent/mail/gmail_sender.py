@@ -52,10 +52,9 @@ class GmailSender:
         message.set_content(markdown_text)
         message.add_alternative(html_body, subtype="html")
 
-        smtp_client = self._create_smtp_client()
-        try:
+        with SMTP(self.smtp_host, self.smtp_port, timeout=30) as smtp_client:
+            smtp_client.ehlo()
             smtp_client.starttls()
+            smtp_client.ehlo()
             smtp_client.login(self.smtp_user, self.smtp_password)
-            smtp_client.sendmail(self.smtp_user, [recipient], message.as_string())
-        finally:
-            smtp_client.quit()
+            smtp_client.send_message(message)
