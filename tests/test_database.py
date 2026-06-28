@@ -12,6 +12,7 @@ from keiba_ai_agent.database import (
     RawRecordRepository,
 )
 from keiba_ai_agent.parser.jg_parser import Horse
+from keiba_ai_agent.services import DataIngestionService
 
 
 def test_repositories_persist_race_horse_and_entry(tmp_path: Path):
@@ -140,6 +141,34 @@ def test_horse_repository_upsert_horse_from_model_prevents_duplicate_names(tmp_p
 
     assert len(rows) == 1
     assert rows[0]["horse_id"] == "horse-2"
+
+
+def test_data_ingestion_service_persists_parsed_records(tmp_path: Path):
+    db_path = tmp_path / "keiba.db"
+    client = Mock()
+    results = [
+        type("Result", (), {"return_code": -3, "has_data": False, "data": "", "filename": ""})(),
+        type("Result", (), {"return_code": 1, "has_data": True, "data": "JG12025062720250628020105002022100614ハーフェン", "filename": "sample.txt"})(),
+        type("Result", (), {"return_code": 0, "has_data": False, "data": "", "filename": ""})(),
+    ]
+    client.read.side_effect = results
+
+    service = DataIngestionService(client=client, database_path=db_path)
+    saved_count = service.ingest(
+        data_spec="RACE",
+        from_time="20240101000000",
+        option=1,
+        save_to_db=True,
+        max_records=2,
+        retry_wait_seconds=0.0,
+    )
+
+    assert saved_count == 1
+    database = KeibaDatabase(db_path=db_path)
+    raw_repo = RawRecordRepository(database)
+    recent = raw_repo.list_recent(limit=10)
+    assert len(recent) == 1
+    assert recent[0]["record_type"] == "JG"
 
 
 def test_show_horses_script_runs_with_default_db_path(tmp_path: Path):

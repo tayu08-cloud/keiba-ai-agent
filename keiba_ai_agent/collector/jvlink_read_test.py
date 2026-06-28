@@ -1,11 +1,8 @@
 ﻿import logging
 import sys
-import time
-from typing import Any
 
 from keiba_ai_agent.collector.jvlink_client import JVLinkClient, JVLinkError
-from keiba_ai_agent.database import KeibaDatabase, HorseRepository, RawRecordRepository
-from keiba_ai_agent.parser.jg_parser import parse_jg_record
+from keiba_ai_agent.services import DataIngestionService
 
 
 def run_read_loop(
@@ -18,70 +15,15 @@ def run_read_loop(
     retry_wait_seconds: float = 1.0,
     database_path: str | None = None,
 ) -> int:
-    if max_records <= 0:
-        return 0
-
-    if save_to_db:
-        database = KeibaDatabase(db_path=database_path or "keiba.db")
-        raw_repo = RawRecordRepository(database)
-        horse_repo = HorseRepository(database)
-    else:
-        raw_repo = None
-        horse_repo = None
-
-    client.initialize()
-    client.open(data_spec=data_spec, from_time=from_time, option=option)
-
-    saved_count = 0
-    try:
-        for _ in range(max_records):
-            while True:
-                try:
-                    result = client.read()
-                except JVLinkError as exc:
-                    if exc.code == -3:
-                        logger = logging.getLogger(__name__)
-                        logger.warning("JVRead returned -3; retrying in %.1fs", retry_wait_seconds)
-                        time.sleep(retry_wait_seconds)
-                        continue
-                    raise
-
-                if result.return_code == 0:
-                    logging.info("JVRead reached EOF")
-                    return saved_count
-
-                if result.return_code == -3:
-                    logging.warning("JVRead returned -3; retrying in %.1fs", retry_wait_seconds)
-                    time.sleep(retry_wait_seconds)
-                    continue
-
-                if not result.has_data:
-                    continue
-
-                if result.data.startswith("JG"):
-                    parsed = parse_jg_record(result.data)
-                    if raw_repo is not None:
-                        raw_repo.save(
-                            {
-                                "raw": parsed.raw,
-                                "record_type": parsed.record_type,
-                                "filename": result.filename,
-                                "return_code": result.return_code,
-                            }
-                        )
-                        horse_repo.upsert_horse_from_model(parsed)
-                        saved_count += 1
-
-                print("=== JV-Link raw data ===")
-                print(f"filename: {result.filename}")
-                print(f"return_code: {result.return_code}")
-                print(result.data)
-                break
-    finally:
-        client.close()
-
-    print(f"Saved {saved_count} records to SQLite.")
-    return saved_count
+    service = DataIngestionService(client=client, database_path=database_path)
+    return service.ingest(
+        data_spec=data_spec,
+        from_time=from_time,
+        option=option,
+        save_to_db=save_to_db,
+        max_records=max_records,
+        retry_wait_seconds=retry_wait_seconds,
+    )
 
 
 def main() -> int:
