@@ -1,5 +1,7 @@
 from pathlib import Path
+from unittest.mock import Mock
 
+from keiba_ai_agent.collector.jvlink_read_test import run_read_loop
 from keiba_ai_agent.database import (
     KeibaDatabase,
     RaceRepository,
@@ -85,3 +87,33 @@ def test_raw_record_repository_persists_parsed_jg_payload(tmp_path: Path):
     assert latest["created_at"]
     assert len(recent) == 1
     assert recent[0]["id"] == latest["id"]
+
+
+def test_run_read_loop_retries_on_return_code_minus_three_and_saves_records(tmp_path: Path):
+    db_path = tmp_path / "keiba.db"
+    client = Mock()
+    results = [
+        type("Result", (), {"return_code": -3, "has_data": False, "data": "", "filename": ""})(),
+        type("Result", (), {"return_code": 1, "has_data": True, "data": "JG12025062720250628020105002022100614ハーフェン", "filename": "sample.txt"})(),
+        type("Result", (), {"return_code": 0, "has_data": False, "data": "", "filename": ""})(),
+    ]
+    client.read.side_effect = results
+
+    saved_count = run_read_loop(
+        client=client,
+        data_spec="RACE",
+        from_time="20240101000000",
+        option=1,
+        save_to_db=True,
+        max_records=2,
+        retry_wait_seconds=0.0,
+        database_path=db_path,
+    )
+
+    database = KeibaDatabase(db_path=db_path)
+    repo = RawRecordRepository(database)
+    recent = repo.list_recent(limit=10)
+
+    assert saved_count == 1
+    assert len(recent) == 1
+    assert recent[0]["record_type"] == "JG"
