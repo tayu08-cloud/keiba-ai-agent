@@ -1,6 +1,10 @@
 import sys
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from keiba_ai_agent.database import KeibaDatabase, RawRecordRepository
 
 
@@ -9,16 +13,16 @@ def resolve_db_path(explicit_path: str | None = None) -> Path:
         return Path(explicit_path).expanduser().resolve()
 
     candidates = [
-        Path("database/data.db"),
-        Path("data.db"),
-        Path("keiba.db"),
+        PROJECT_ROOT / "database" / "data.db",
+        PROJECT_ROOT / "data.db",
+        PROJECT_ROOT / "keiba.db",
     ]
 
     for candidate in candidates:
         if candidate.exists():
             return candidate
 
-    return candidates[0]
+    return candidates[-1]
 
 
 def main() -> int:
