@@ -2,6 +2,7 @@
 import sys
 
 from keiba_ai_agent.collector.jvlink_client import JVLinkClient, JVLinkError
+from keiba_ai_agent.database import KeibaDatabase, RawRecordRepository
 from keiba_ai_agent.parser.jg_parser import parse_jg_record
 
 
@@ -14,11 +15,13 @@ def main() -> int:
     data_spec = sys.argv[1] if len(sys.argv) >= 2 else "RACE"
     from_time = sys.argv[2] if len(sys.argv) >= 3 else "20240101000000"
     option = int(sys.argv[3]) if len(sys.argv) >= 4 else 1
+    save_to_db = len(sys.argv) >= 5 and sys.argv[4].lower() in {"1", "true", "yes", "save"}
 
     print("=== JV-Link raw read test ===")
     print(f"data_spec={data_spec}")
     print(f"from_time={from_time}")
     print(f"option={option}")
+    print(f"save_to_db={save_to_db}")
 
     client = JVLinkClient()
 
@@ -42,8 +45,22 @@ def main() -> int:
     print(result.data)
 
     if result.data.startswith("JG"):
+        parsed = parse_jg_record(result.data)
         print("=== Parsed JG data ===")
-        print(parse_jg_record(result.data))
+        print(parsed)
+
+        if save_to_db:
+            database = KeibaDatabase(db_path="keiba.db")
+            repo = RawRecordRepository(database)
+            repo.save(
+                {
+                    "raw": parsed["raw"],
+                    "record_type": parsed["record_type"],
+                    "filename": result.filename,
+                    "return_code": result.return_code,
+                }
+            )
+            print("Saved parsed record to SQLite.")
 
     return 0
 
