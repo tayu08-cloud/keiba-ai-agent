@@ -11,6 +11,7 @@ from keiba_ai_agent.database import (
     EntryRepository,
     RawRecordRepository,
 )
+from keiba_ai_agent.features.feature_builder import FeatureBuilder
 from keiba_ai_agent.models import HorseFeature, RaceFeature, EntryFeature, Feature, FeatureRepository
 from keiba_ai_agent.parser.jg_parser import Horse
 from keiba_ai_agent.services import DataIngestionService
@@ -168,6 +169,45 @@ def test_feature_repository_persists_features(tmp_path: Path):
     assert saved is not None
     assert saved["feature_name"] == "speed"
     assert saved["feature_value"] == 0.82
+
+
+def test_feature_builder_creates_minimal_features_and_saves_them(tmp_path: Path):
+    db_path = tmp_path / "keiba.db"
+    database = KeibaDatabase(db_path=db_path)
+    horse_repo = HorseRepository(database)
+    horse_repo.upsert_horse_from_model(Horse(horse_name="サクラ", horse_id="horse-1"))
+
+    builder = FeatureBuilder(database_path=db_path)
+    saved_count = builder.save_features_for_horses()
+
+    assert saved_count == 2
+    feature_repo = FeatureRepository(database)
+    saved = feature_repo.get_by_id("horse-1:horse_name_length")
+    assert saved is not None
+    assert saved["feature_name"] == "horse_name_length"
+    assert saved["feature_value"] == 3
+
+
+def test_build_features_script_runs(tmp_path: Path):
+    db_path = tmp_path / "keiba.db"
+    database = KeibaDatabase(db_path=db_path)
+    horse_repo = HorseRepository(database)
+    horse_repo.upsert_horse_from_model(Horse(horse_name="テスト馬", horse_id="horse-test"))
+
+    env = dict(__import__("os").environ)
+    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1])
+
+    result = subprocess.run(
+        [sys.executable, "scripts/build_features.py", str(db_path)],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "Saved 2 features" in result.stdout
 
 
 def test_data_ingestion_service_persists_parsed_records(tmp_path: Path):
