@@ -61,8 +61,8 @@ def run_read_loop(
                     if repo is not None:
                         repo.save(
                             {
-                                "raw": parsed["raw"],
-                                "record_type": parsed["record_type"],
+                                "raw": parsed.raw,
+                                "record_type": parsed.record_type,
                                 "filename": result.filename,
                                 "return_code": result.return_code,
                             }

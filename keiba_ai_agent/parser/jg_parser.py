@@ -1,12 +1,46 @@
-﻿import re
+﻿from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+from typing import Any
 
 
-def parse_jg_record(raw: str) -> dict:
-    """Parse the minimum fields from a JV-Link JG raw record.
+@dataclass
+class Horse:
+    """Minimal horse model for parsed JV-Link JG records.
 
-    This parser is intentionally conservative. It keeps the original raw text
-    and only extracts fields that can be identified safely from current samples.
+    The parser keeps the minimum fields required now while leaving room for
+    future expansion such as horse_id, sex, age, trainer, owner, and breeder.
     """
+
+    horse_name: str | None = None
+    record_type: str | None = None
+    raw: str | None = None
+    horse_id: str | None = None
+    sex: str | None = None
+    age: int | None = None
+    trainer: str | None = None
+    owner: str | None = None
+    breeder: str | None = None
+    extra: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "horse_name": self.horse_name,
+            "record_type": self.record_type,
+            "raw": self.raw,
+            "horse_id": self.horse_id,
+            "sex": self.sex,
+            "age": self.age,
+            "trainer": self.trainer,
+            "owner": self.owner,
+            "breeder": self.breeder,
+            "extra": self.extra,
+        }
+
+
+def parse_jg_record(raw: str) -> Horse:
+    """Parse a fixed-length JV-Link JG record into a Horse dataclass."""
     cleaned = raw.rstrip("\r\n")
 
     if len(cleaned) < 2:
@@ -17,13 +51,14 @@ def parse_jg_record(raw: str) -> dict:
         raise ValueError(f"Unsupported record type: {record_type}")
 
     candidates = _extract_name_candidates(cleaned)
+    horse_name = candidates[0] if candidates else None
 
-    return {
-        "record_type": record_type,
-        "raw": cleaned,
-        "name": candidates[0] if candidates else None,
-        "horse_name_candidates": candidates,
-    }
+    return Horse(
+        horse_name=horse_name,
+        record_type=record_type,
+        raw=cleaned,
+        extra={"horse_name_candidates": candidates},
+    )
 
 
 def _extract_name_candidates(raw: str) -> list[str]:
