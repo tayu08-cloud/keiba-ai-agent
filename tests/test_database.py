@@ -16,6 +16,8 @@ from keiba_ai_agent.database import (
 from keiba_ai_agent.features.feature_builder import FeatureBuilder
 from keiba_ai_agent.models import HorseFeature, RaceFeature, EntryFeature, Feature, FeatureRepository
 from keiba_ai_agent.predictor.baseline import BaselinePredictor
+from keiba_ai_agent.predictor.evaluate import evaluate_model
+from keiba_ai_agent.predictor.predict import main as predict_main
 from keiba_ai_agent.parser.jg_parser import Horse
 from keiba_ai_agent.services import DataIngestionService
 
@@ -336,6 +338,43 @@ def test_baseline_predictor_trains_and_predicts(tmp_path: Path):
     assert len(probabilities) == 4
     assert (tmp_path / "models" / "baseline_model.joblib").exists()
     assert probabilities[0] >= 0
+
+
+def test_predictor_evaluation_and_prediction_export(tmp_path: Path):
+    import pandas as pd
+
+    train_df = pd.DataFrame(
+        [
+            {"horse_id": "h1", "horse_name": "A", "horse_name_length": 3, "has_horse_id": 1, "label": 1},
+            {"horse_id": "h2", "horse_name": "B", "horse_name_length": 5, "has_horse_id": 1, "label": 1},
+            {"horse_id": "h3", "horse_name": "C", "horse_name_length": 2, "has_horse_id": 0, "label": 0},
+            {"horse_id": "h4", "horse_name": "D", "horse_name_length": 4, "has_horse_id": 0, "label": 0},
+        ]
+    )
+    inference_df = pd.DataFrame(
+        [
+            {"horse_id": "h5", "horse_name": "E", "horse_name_length": 3, "has_horse_id": 1},
+            {"horse_id": "h6", "horse_name": "F", "horse_name_length": 4, "has_horse_id": 0},
+        ]
+    )
+
+    train_path = tmp_path / "train.csv"
+    inference_path = tmp_path / "inference.csv"
+    train_df.to_csv(train_path, index=False)
+    inference_df.to_csv(inference_path, index=False)
+
+    predictor = BaselinePredictor(model_dir=tmp_path / "models")
+    predictor.train(train_path)
+    metrics = evaluate_model(predictor, train_path)
+    assert metrics["accuracy"] >= 0
+    assert metrics["roc_auc"] >= 0
+
+    output_path = tmp_path / "predictions.csv"
+    predictor.predict_and_save(inference_path, output_path)
+    saved = pd.read_csv(output_path)
+    assert list(saved.columns) == ["horse_id", "horse_name", "prediction_score", "predicted_label"]
+    assert len(saved) == 2
+    assert saved.loc[0, "horse_id"] == "h5"
 
 
 def test_show_features_script_runs_and_displays_latest_features(tmp_path: Path):

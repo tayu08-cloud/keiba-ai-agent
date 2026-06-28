@@ -1,0 +1,5 @@
+horse_id,horse_name,horse_name_length,has_horse_id,label
+h1,A,3,1,1
+h2,B,5,1,1
+h3,C,2,0,0
+h4,D,4,0,0

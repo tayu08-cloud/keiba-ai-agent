@@ -51,6 +51,22 @@ class BaselinePredictor:
         features = dataframe[self._feature_columns()]
         return [float(value) for value in self.model.predict_proba(features)[:, 1]]
 
+    def predict_and_save(self, dataset_path: str | Path, output_path: str | Path) -> pd.DataFrame:
+        dataframe = pd.read_csv(dataset_path)
+        scores = self.predict(dataset_path)
+        predictions = pd.DataFrame(
+            {
+                "horse_id": dataframe.get("horse_id", [None] * len(dataframe)),
+                "horse_name": dataframe.get("horse_name", [None] * len(dataframe)),
+                "prediction_score": scores,
+                "predicted_label": [int(score >= 0.5) for score in scores],
+            }
+        )
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        predictions.to_csv(output_path, index=False)
+        return predictions
+
     def _save_model(self, model: Any) -> None:
         with self.model_path.open("wb") as handle:
             pickle.dump(model, handle)

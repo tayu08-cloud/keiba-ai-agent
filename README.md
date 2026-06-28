@@ -39,7 +39,10 @@
 - 学習
   - `.\.venv\Scripts\python.exe -m keiba_ai_agent.predictor.train dataset/dataset.csv --model-dir models`
 
+- 評価
+  - `.\.venv\Scripts\python.exe -m keiba_ai_agent.predictor.evaluate dataset/dataset.csv --model-dir models`
+
 - 推論
-  - `.\.venv\Scripts\python.exe -m keiba_ai_agent.predictor.predict dataset/dataset.csv --model-dir models`
+  - `.\.venv\Scripts\python.exe -m keiba_ai_agent.predictor.predict dataset/dataset.csv --model-dir models --output predictions.csv`
 
 詳細は [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) を参照してください。
