@@ -1,4 +1,5 @@
 ﻿import logging
+import time
 from dataclasses import dataclass
 
 import win32com.client
@@ -26,6 +27,8 @@ class JVReadResult:
 
 
 class JVLinkClient:
+    DOWNLOAD_IN_PROGRESS = -3
+
     def __init__(self, sid: str = "UNKNOWN"):
         self.sid = sid
         self._jvlink = None
@@ -66,18 +69,44 @@ class JVLinkClient:
             data = ""
             filename = ""
 
-        if result < 0:
-            logger.error("JVRead failed return_code=%s", result)
+        if result < 0 and result != self.DOWNLOAD_IN_PROGRESS:
+            self._raise_if_error("JVRead", result)
 
         return JVReadResult(result, data.rstrip("\0").rstrip(), filename.strip("\0").strip())
 
-    def read_first(self, data_spec: str, from_time: str, option: int = 1):
+    def read_first(
+        self,
+        data_spec: str,
+        from_time: str,
+        option: int = 1,
+        wait_seconds: int = 5,
+        max_retries: int = 60,
+    ):
         self.open(data_spec, from_time, option)
+
         try:
-            result = self.read()
-            if result.return_code == 0:
-                return None
-            return result
+            for attempt in range(1, max_retries + 1):
+                result = self.read()
+
+                if result.return_code == self.DOWNLOAD_IN_PROGRESS:
+                    logger.info(
+                        "Download in progress. wait_seconds=%s attempt=%s/%s",
+                        wait_seconds,
+                        attempt,
+                        max_retries,
+                    )
+                    time.sleep(wait_seconds)
+                    continue
+
+                if result.return_code == 0:
+                    return None
+
+                if result.has_data:
+                    return result
+
+                return result
+
+            raise JVLinkError("JVRead", self.DOWNLOAD_IN_PROGRESS)
         finally:
             self.close()
 
