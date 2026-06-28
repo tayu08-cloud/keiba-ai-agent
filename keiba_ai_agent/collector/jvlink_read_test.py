@@ -4,7 +4,7 @@ import time
 from typing import Any
 
 from keiba_ai_agent.collector.jvlink_client import JVLinkClient, JVLinkError
-from keiba_ai_agent.database import KeibaDatabase, RawRecordRepository
+from keiba_ai_agent.database import KeibaDatabase, HorseRepository, RawRecordRepository
 from keiba_ai_agent.parser.jg_parser import parse_jg_record
 
 
@@ -23,9 +23,11 @@ def run_read_loop(
 
     if save_to_db:
         database = KeibaDatabase(db_path=database_path or "keiba.db")
-        repo = RawRecordRepository(database)
+        raw_repo = RawRecordRepository(database)
+        horse_repo = HorseRepository(database)
     else:
-        repo = None
+        raw_repo = None
+        horse_repo = None
 
     client.initialize()
     client.open(data_spec=data_spec, from_time=from_time, option=option)
@@ -58,8 +60,8 @@ def run_read_loop(
 
                 if result.data.startswith("JG"):
                     parsed = parse_jg_record(result.data)
-                    if repo is not None:
-                        repo.save(
+                    if raw_repo is not None:
+                        raw_repo.save(
                             {
                                 "raw": parsed.raw,
                                 "record_type": parsed.record_type,
@@ -67,6 +69,7 @@ def run_read_loop(
                                 "return_code": result.return_code,
                             }
                         )
+                        horse_repo.upsert_horse_from_model(parsed)
                         saved_count += 1
 
                 print("=== JV-Link raw data ===")

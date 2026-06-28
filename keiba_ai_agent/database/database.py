@@ -2,6 +2,8 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+from keiba_ai_agent.parser.jg_parser import Horse
+
 
 class KeibaDatabase:
     def __init__(self, db_path: str | Path | None = None):
@@ -77,10 +79,42 @@ class HorseRepository(BaseRepository):
             (payload.get("horse_id"), payload.get("horse_name")),
         )
 
+    def upsert_horse_from_model(self, horse: Horse) -> None:
+        if not horse.horse_name:
+            raise ValueError("horse_name is required")
+
+        with self.database.connect() as connection:
+            existing = connection.execute(
+                "SELECT horse_id FROM horses WHERE horse_name = ?",
+                (horse.horse_name,),
+            ).fetchone()
+
+            if existing is None:
+                connection.execute(
+                    """
+                    INSERT INTO horses (horse_id, horse_name)
+                    VALUES (?, ?)
+                    """,
+                    (horse.horse_id, horse.horse_name),
+                )
+            else:
+                if horse.horse_id:
+                    connection.execute(
+                        "UPDATE horses SET horse_id = ? WHERE horse_name = ?",
+                        (horse.horse_id, horse.horse_name),
+                    )
+            connection.commit()
+
     def get_by_id(self, horse_id: str) -> dict[str, Any] | None:
         return self._fetch_one(
             "SELECT horse_id, horse_name FROM horses WHERE horse_id = ?",
             (horse_id,),
+        )
+
+    def get_by_name(self, horse_name: str) -> dict[str, Any] | None:
+        return self._fetch_one(
+            "SELECT horse_id, horse_name FROM horses WHERE horse_name = ?",
+            (horse_name,),
         )
 
 

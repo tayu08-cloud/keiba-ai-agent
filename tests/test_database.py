@@ -111,9 +111,29 @@ def test_run_read_loop_retries_on_return_code_minus_three_and_saves_records(tmp_
     )
 
     database = KeibaDatabase(db_path=db_path)
-    repo = RawRecordRepository(database)
-    recent = repo.list_recent(limit=10)
+    raw_repo = RawRecordRepository(database)
+    recent = raw_repo.list_recent(limit=10)
+    horse_repo = HorseRepository(database)
+    horse = horse_repo.get_by_name("ハーフェン")
 
     assert saved_count == 1
     assert len(recent) == 1
     assert recent[0]["record_type"] == "JG"
+    assert horse is not None
+    assert horse["horse_name"] == "ハーフェン"
+
+
+def test_horse_repository_upsert_horse_from_model_prevents_duplicate_names(tmp_path: Path):
+    db_path = tmp_path / "keiba.db"
+    database = KeibaDatabase(db_path=db_path)
+    repo = HorseRepository(database)
+
+    from keiba_ai_agent.parser.jg_parser import Horse
+
+    repo.upsert_horse_from_model(Horse(horse_name="サクラ", horse_id="horse-1"))
+    repo.upsert_horse_from_model(Horse(horse_name="サクラ", horse_id="horse-2"))
+
+    rows = database.connect().execute("SELECT horse_id, horse_name FROM horses WHERE horse_name = ?", ("サクラ",)).fetchall()
+
+    assert len(rows) == 1
+    assert rows[0]["horse_id"] == "horse-2"
