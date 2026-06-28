@@ -1,7 +1,6 @@
 ﻿import logging
 from dataclasses import dataclass
 
-import pythoncom
 import win32com.client
 
 
@@ -36,7 +35,7 @@ class JVLinkClient:
         logger.info("Initializing JV-Link")
         self._jvlink = win32com.client.Dispatch("JVDTLab.JVLink")
 
-        result = int(self._jvlink.JVInit(self.sid))
+        result = self._to_int_return_code("JVInit", self._jvlink.JVInit(self.sid))
         self._raise_if_error("JVInit", result)
 
         logger.info("JVInit succeeded")
@@ -45,13 +44,6 @@ class JVLinkClient:
     def open(self, data_spec: str, from_time: str, option: int = 1):
         self._ensure_initialized()
 
-        read_count = pythoncom.VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
-        download_count = pythoncom.VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
-        last_file_timestamp = pythoncom.VARIANT(
-            pythoncom.VT_BYREF | pythoncom.VT_BSTR,
-            "",
-        )
-
         logger.info(
             "Calling JVOpen data_spec=%s from_time=%s option=%s",
             data_spec,
@@ -59,51 +51,51 @@ class JVLinkClient:
             option,
         )
 
-        result = int(
-            self._jvlink.JVOpen(
-                data_spec,
-                from_time,
-                option,
-                read_count,
-                download_count,
-                last_file_timestamp,
-            )
-        )
-        self._raise_if_error("JVOpen", result)
+        raw_result = self._jvlink.JVOpen(data_spec, from_time, option, 0, 0, "")
+        logger.info("JVOpen raw_result=%r type=%s", raw_result, type(raw_result).__name__)
 
+        if isinstance(raw_result, tuple):
+            result = self._to_int_return_code("JVOpen", raw_result[0])
+            read_count = raw_result[1] if len(raw_result) > 1 else 0
+            download_count = raw_result[2] if len(raw_result) > 2 else 0
+            last_file_timestamp = raw_result[3] if len(raw_result) > 3 else ""
+        else:
+            result = self._to_int_return_code("JVOpen", raw_result)
+            read_count = 0
+            download_count = 0
+            last_file_timestamp = ""
+
+        self._raise_if_error("JVOpen", result)
         self._opened = True
-        logger.info(
-            "JVOpen succeeded return_code=%s read_count=%s download_count=%s last_file_timestamp=%s",
-            result,
-            read_count.value,
-            download_count.value,
-            last_file_timestamp.value,
-        )
 
         return {
             "return_code": result,
-            "read_count": read_count.value,
-            "download_count": download_count.value,
-            "last_file_timestamp": last_file_timestamp.value,
+            "read_count": read_count,
+            "download_count": download_count,
+            "last_file_timestamp": last_file_timestamp,
         }
 
     def read(self, buffer_size: int = 110000) -> JVReadResult:
         self._ensure_opened()
 
-        data = pythoncom.VARIANT(pythoncom.VT_BYREF | pythoncom.VT_BSTR, "")
-        filename = pythoncom.VARIANT(pythoncom.VT_BYREF | pythoncom.VT_BSTR, "")
+        raw_result = self._jvlink.JVRead("", buffer_size, "")
+        logger.info("JVRead raw_result=%r type=%s", raw_result, type(raw_result).__name__)
 
-        result = int(self._jvlink.JVRead(data, buffer_size, filename))
+        if isinstance(raw_result, tuple):
+            result = self._to_int_return_code("JVRead", raw_result[0])
+            data = raw_result[1] if len(raw_result) > 1 else ""
+            filename = raw_result[2] if len(raw_result) > 2 else ""
+        else:
+            result = self._to_int_return_code("JVRead", raw_result)
+            data = ""
+            filename = ""
 
-        if result < 0:
-            self._raise_if_error("JVRead", result)
-
-        logger.info("JVRead returned return_code=%s filename=%s", result, filename.value)
+        self._raise_if_error("JVRead", result)
 
         return JVReadResult(
             return_code=result,
-            data=data.value,
-            filename=filename.value,
+            data=data,
+            filename=filename,
         )
 
     def read_first(self, data_spec: str, from_time: str, option: int = 1) -> JVReadResult | None:
@@ -126,7 +118,7 @@ class JVLinkClient:
         self._ensure_initialized()
 
         logger.info("Calling JVClose")
-        result = int(self._jvlink.JVClose())
+        result = self._to_int_return_code("JVClose", self._jvlink.JVClose())
         self._raise_if_error("JVClose", result)
 
         self._opened = False
@@ -150,3 +142,11 @@ class JVLinkClient:
         if code < 0:
             logger.error("%s failed return_code=%s", method, code)
             raise JVLinkError(method, code)
+
+    def _to_int_return_code(self, method: str, value) -> int:
+        logger.debug("%s raw return=%r type=%s", method, value, type(value).__name__)
+
+        if hasattr(value, "value"):
+            value = value.value
+
+        return int(value)
