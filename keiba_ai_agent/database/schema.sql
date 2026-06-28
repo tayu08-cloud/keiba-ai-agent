@@ -35,3 +35,10 @@ CREATE TABLE IF NOT EXISTS raw_records (
     return_code INTEGER NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS features (
+    feature_id TEXT PRIMARY KEY,
+    feature_name TEXT NOT NULL,
+    feature_value REAL,
+    source TEXT
+);

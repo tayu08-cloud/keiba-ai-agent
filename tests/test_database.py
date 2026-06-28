@@ -11,6 +11,7 @@ from keiba_ai_agent.database import (
     EntryRepository,
     RawRecordRepository,
 )
+from keiba_ai_agent.models import HorseFeature, RaceFeature, EntryFeature, Feature, FeatureRepository
 from keiba_ai_agent.parser.jg_parser import Horse
 from keiba_ai_agent.services import DataIngestionService
 
@@ -141,6 +142,32 @@ def test_horse_repository_upsert_horse_from_model_prevents_duplicate_names(tmp_p
 
     assert len(rows) == 1
     assert rows[0]["horse_id"] == "horse-2"
+
+
+def test_feature_models_round_trip_through_dicts() -> None:
+    horse_feature = HorseFeature(horse_id="horse-1", feature_name="speed", feature_value=0.82)
+    race_feature = RaceFeature(race_id="race-1", feature_name="distance", feature_value=1800)
+    entry_feature = EntryFeature(race_id="race-1", horse_id="horse-1", feature_name="odds", feature_value=6.2)
+    feature = Feature(feature_id="f-1", feature_name="sample", feature_value=1.0, source="test")
+
+    assert horse_feature.to_dict()["horse_id"] == "horse-1"
+    assert race_feature.to_dict()["race_id"] == "race-1"
+    assert entry_feature.to_dict()["feature_name"] == "odds"
+    assert Feature.from_dict(feature.to_dict()).feature_name == "sample"
+
+
+def test_feature_repository_persists_features(tmp_path: Path):
+    db_path = tmp_path / "keiba.db"
+    database = KeibaDatabase(db_path=db_path)
+    repo = FeatureRepository(database)
+
+    feature = Feature(feature_id="f-1", feature_name="speed", feature_value=0.82, source="test")
+    repo.save(feature)
+
+    saved = repo.get_by_id("f-1")
+    assert saved is not None
+    assert saved["feature_name"] == "speed"
+    assert saved["feature_value"] == 0.82
 
 
 def test_data_ingestion_service_persists_parsed_records(tmp_path: Path):

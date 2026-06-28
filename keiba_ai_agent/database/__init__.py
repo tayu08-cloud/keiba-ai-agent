@@ -1,4 +1,5 @@
 from .database import EntryRepository, HorseRepository, KeibaDatabase, RaceRepository, RawRecordRepository
+from .feature_repository import FeatureRepository
 
 __all__ = [
     "KeibaDatabase",
@@ -6,4 +7,5 @@ __all__ = [
     "HorseRepository",
     "EntryRepository",
     "RawRecordRepository",
+    "FeatureRepository",
 ]
