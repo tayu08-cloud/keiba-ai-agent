@@ -162,3 +162,30 @@ def test_show_horses_script_runs_with_default_db_path(tmp_path: Path):
 
     assert result.returncode == 0
     assert "テスト馬" in result.stdout
+
+
+def test_show_record_types_script_reports_counts(tmp_path: Path):
+    db_path = tmp_path / "keiba.db"
+    database = KeibaDatabase(db_path=db_path)
+
+    with database.connect() as connection:
+        connection.execute("INSERT INTO raw_records (raw, record_type, filename, return_code) VALUES (?, ?, ?, ?)", ("JG1", "JG", "a.txt", 1))
+        connection.execute("INSERT INTO raw_records (raw, record_type, filename, return_code) VALUES (?, ?, ?, ?)", ("JG2", "JG", "b.txt", 1))
+        connection.execute("INSERT INTO raw_records (raw, record_type, filename, return_code) VALUES (?, ?, ?, ?)", ("RA1", "RA", "c.txt", 1))
+        connection.commit()
+
+    env = dict(__import__("os").environ)
+    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1])
+
+    result = subprocess.run(
+        [sys.executable, "scripts/show_record_types.py", str(db_path)],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "JG: 2" in result.stdout
+    assert "RA: 1" in result.stdout
