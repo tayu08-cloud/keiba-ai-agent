@@ -75,6 +75,7 @@ def test_raw_record_repository_persists_parsed_jg_payload(tmp_path: Path):
 
     repo.save(payload)
     latest = repo.get_latest()
+    recent = repo.list_recent(limit=10)
 
     assert latest is not None
     assert latest["raw"] == payload["raw"]
@@ -82,3 +83,5 @@ def test_raw_record_repository_persists_parsed_jg_payload(tmp_path: Path):
     assert latest["filename"] == payload["filename"]
     assert latest["return_code"] == payload["return_code"]
     assert latest["created_at"]
+    assert len(recent) == 1
+    assert recent[0]["id"] == latest["id"]

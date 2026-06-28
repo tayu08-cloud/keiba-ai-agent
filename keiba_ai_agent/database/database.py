@@ -136,3 +136,14 @@ class RawRecordRepository(BaseRepository):
             FROM raw_records ORDER BY id DESC LIMIT 1
             """
         )
+
+    def list_recent(self, limit: int = 10) -> list[dict[str, Any]]:
+        with self.database.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, raw, record_type, filename, return_code, created_at
+                FROM raw_records ORDER BY id DESC LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+            return [dict(row) for row in rows]
