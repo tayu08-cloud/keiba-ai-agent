@@ -2,6 +2,7 @@
 import sys
 
 from keiba_ai_agent.collector.jvlink_client import JVLinkClient, JVLinkError
+from keiba_ai_agent.parser.jg_parser import parse_jg_record
 
 
 def main() -> int:
@@ -39,6 +40,10 @@ def main() -> int:
     print(f"filename: {result.filename}")
     print(f"return_code: {result.return_code}")
     print(result.data)
+
+    if result.data.startswith("JG"):
+        print("=== Parsed JG data ===")
+        print(parse_jg_record(result.data))
 
     return 0
 
