@@ -23,7 +23,7 @@ class JVReadResult:
 
     @property
     def has_data(self) -> bool:
-        return self.return_code > 0
+        return self.return_code > 0 and bool(self.data)
 
 
 class JVLinkClient:
@@ -52,6 +52,13 @@ class JVLinkClient:
             "",
         )
 
+        logger.info(
+            "Calling JVOpen data_spec=%s from_time=%s option=%s",
+            data_spec,
+            from_time,
+            option,
+        )
+
         result = int(
             self._jvlink.JVOpen(
                 data_spec,
@@ -65,6 +72,14 @@ class JVLinkClient:
         self._raise_if_error("JVOpen", result)
 
         self._opened = True
+        logger.info(
+            "JVOpen succeeded return_code=%s read_count=%s download_count=%s last_file_timestamp=%s",
+            result,
+            read_count.value,
+            download_count.value,
+            last_file_timestamp.value,
+        )
+
         return {
             "return_code": result,
             "read_count": read_count.value,
@@ -79,8 +94,11 @@ class JVLinkClient:
         filename = pythoncom.VARIANT(pythoncom.VT_BYREF | pythoncom.VT_BSTR, "")
 
         result = int(self._jvlink.JVRead(data, buffer_size, filename))
+
         if result < 0:
             self._raise_if_error("JVRead", result)
+
+        logger.info("JVRead returned return_code=%s filename=%s", result, filename.value)
 
         return JVReadResult(
             return_code=result,
@@ -88,13 +106,31 @@ class JVLinkClient:
             filename=filename.value,
         )
 
+    def read_first(self, data_spec: str, from_time: str, option: int = 1) -> JVReadResult | None:
+        self.open(data_spec=data_spec, from_time=from_time, option=option)
+
+        try:
+            while True:
+                result = self.read()
+
+                if result.return_code == 0:
+                    logger.info("JVRead reached EOF")
+                    return None
+
+                if result.has_data:
+                    return result
+        finally:
+            self.close()
+
     def close(self) -> int:
         self._ensure_initialized()
 
+        logger.info("Calling JVClose")
         result = int(self._jvlink.JVClose())
         self._raise_if_error("JVClose", result)
 
         self._opened = False
+        logger.info("JVClose succeeded")
         return result
 
     def get_com_object(self):
