@@ -21,17 +21,25 @@
 ## 代表的な実行コマンド
 
 - JV-Link 収集
-  - `./.venv32/Scripts/python.exe -m keiba_ai_agent.collector.jvlink_read_test RACE 20240101000000 1 save 5`
+  - `.\.venv32\Scripts\python.exe -m keiba_ai_agent.collector.jvlink_read_test RACE 20240101000000 1 save 5`
 
 - Dataset 生成
-  - `c:/keiba-ai-agent/.venv/Scripts/python.exe scripts/build_dataset.py keiba.db dataset`
+  - `.\.venv\Scripts\python.exe scripts/build_dataset.py keiba.db dataset`
 
 ## pytest
 
 - JV-Link / 収集系
-  - `./.venv32/Scripts/python.exe -m pytest -q`
+  - `.\.venv32\Scripts\python.exe -m pytest -q`
 
 - AI / dataset 系
-  - `c:/keiba-ai-agent/.venv/Scripts/python.exe -m pytest -q`
+  - `.\.venv\Scripts\python.exe -m pytest -q`
+
+## Baseline Predictor
+
+- 学習
+  - `.\.venv\Scripts\python.exe -m keiba_ai_agent.predictor.train dataset/dataset.csv --model-dir models`
+
+- 推論
+  - `.\.venv\Scripts\python.exe -m keiba_ai_agent.predictor.predict dataset/dataset.csv --model-dir models`
 
 詳細は [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) を参照してください。

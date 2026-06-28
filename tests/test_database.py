@@ -15,6 +15,7 @@ from keiba_ai_agent.database import (
 )
 from keiba_ai_agent.features.feature_builder import FeatureBuilder
 from keiba_ai_agent.models import HorseFeature, RaceFeature, EntryFeature, Feature, FeatureRepository
+from keiba_ai_agent.predictor.baseline import BaselinePredictor
 from keiba_ai_agent.parser.jg_parser import Horse
 from keiba_ai_agent.services import DataIngestionService
 
@@ -312,6 +313,29 @@ def test_build_dataset_script_runs(tmp_path: Path):
 
     assert result.returncode == 0
     assert "Saved dataset" in result.stdout
+
+
+def test_baseline_predictor_trains_and_predicts(tmp_path: Path):
+    import pandas as pd
+
+    dataset_path = tmp_path / "dataset.csv"
+    train_df = pd.DataFrame(
+        [
+            {"horse_name_length": 3, "has_horse_id": 1, "label": 1},
+            {"horse_name_length": 5, "has_horse_id": 1, "label": 1},
+            {"horse_name_length": 2, "has_horse_id": 0, "label": 0},
+            {"horse_name_length": 4, "has_horse_id": 0, "label": 0},
+        ]
+    )
+    train_df.to_csv(dataset_path, index=False)
+
+    predictor = BaselinePredictor(model_dir=tmp_path / "models")
+    predictor.train(str(dataset_path))
+    probabilities = predictor.predict(str(dataset_path))
+
+    assert len(probabilities) == 4
+    assert (tmp_path / "models" / "baseline_model.joblib").exists()
+    assert probabilities[0] >= 0
 
 
 def test_show_features_script_runs_and_displays_latest_features(tmp_path: Path):

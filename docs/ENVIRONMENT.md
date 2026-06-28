@@ -32,8 +32,8 @@
 
 ## 4. pytest コマンド
 
-- JV-Link / 収集系: `.venv32\Scripts\python.exe -m pytest -q`
-- AI / dataset 系: `c:/keiba-ai-agent/.venv/Scripts/python.exe -m pytest -q`
+- JV-Link / 収集系: `.\.venv32\Scripts\python.exe -m pytest -q`
+- AI / dataset 系: `.\.venv\Scripts\python.exe -m pytest -q`
 
 ## 5. 依存関係
 
