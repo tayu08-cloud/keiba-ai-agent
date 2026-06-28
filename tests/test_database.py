@@ -1,3 +1,5 @@
+import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -9,6 +11,7 @@ from keiba_ai_agent.database import (
     EntryRepository,
     RawRecordRepository,
 )
+from keiba_ai_agent.parser.jg_parser import Horse
 
 
 def test_repositories_persist_race_horse_and_entry(tmp_path: Path):
@@ -137,3 +140,25 @@ def test_horse_repository_upsert_horse_from_model_prevents_duplicate_names(tmp_p
 
     assert len(rows) == 1
     assert rows[0]["horse_id"] == "horse-2"
+
+
+def test_show_horses_script_runs_with_default_db_path(tmp_path: Path):
+    db_path = tmp_path / "keiba.db"
+    database = KeibaDatabase(db_path=db_path)
+    repo = HorseRepository(database)
+    repo.upsert_horse_from_model(Horse(horse_name="テスト馬", horse_id="horse-test"))
+
+    env = dict(__import__("os").environ)
+    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1])
+
+    result = subprocess.run(
+        [sys.executable, "scripts/show_horses.py", str(db_path)],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "テスト馬" in result.stdout
