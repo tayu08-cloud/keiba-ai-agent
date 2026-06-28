@@ -19,6 +19,7 @@ from keiba_ai_agent.predictor.baseline import BaselinePredictor
 from keiba_ai_agent.predictor.evaluate import evaluate_model
 from keiba_ai_agent.predictor.predict import main as predict_main
 from keiba_ai_agent.parser.jg_parser import Horse
+from keiba_ai_agent.report.report_builder import ReportBuilder
 from keiba_ai_agent.services import DataIngestionService
 
 
@@ -375,6 +376,46 @@ def test_predictor_evaluation_and_prediction_export(tmp_path: Path):
     assert list(saved.columns) == ["horse_id", "horse_name", "prediction_score", "predicted_label"]
     assert len(saved) == 2
     assert saved.loc[0, "horse_id"] == "h5"
+
+
+def test_report_builder_writes_race_markdown_reports(tmp_path: Path):
+    import pandas as pd
+
+    predictions_path = tmp_path / "predictions.csv"
+    pd.DataFrame(
+        [
+            {"race_id": "20250628-01", "racecourse": "東京", "race_number": 1, "horse_id": "h1", "horse_name": "サクラ", "prediction_score": 0.82, "predicted_label": 1},
+            {"race_id": "20250628-01", "racecourse": "東京", "race_number": 1, "horse_id": "h2", "horse_name": "ヒカル", "prediction_score": 0.71, "predicted_label": 1},
+            {"race_id": "20250628-01", "racecourse": "東京", "race_number": 1, "horse_id": "h3", "horse_name": "ミズキ", "prediction_score": 0.41, "predicted_label": 0},
+        ]
+    ).to_csv(predictions_path, index=False)
+
+    builder = ReportBuilder(output_dir=tmp_path / "reports")
+    report_paths = builder.build_from_predictions(predictions_path, openai_comment="ここにAIコメント")
+
+    assert len(report_paths) == 1
+    report_path = report_paths[0]
+    content = report_path.read_text(encoding="utf-8")
+    assert "# 東京競馬場 第1R" in content
+    assert "◎ 本命" in content
+    assert "予測スコア表" in content
+    assert "ここにAIコメント" in content
+    assert report_path.exists()
+
+
+def test_report_builder_reads_cp932_encoded_predictions(tmp_path: Path):
+    predictions_path = tmp_path / "predictions.csv"
+    predictions_path.write_text(
+        "race_id,racecourse,race_number,race_name,horse_id,horse_name,prediction_score,predicted_label\n"
+        "20250628-01,東京,1,東京メイプル賞,h1,サクラ,0.82,1\n",
+        encoding="cp932",
+    )
+
+    builder = ReportBuilder(output_dir=tmp_path / "reports")
+    report_paths = builder.build_from_predictions(predictions_path)
+
+    assert len(report_paths) == 1
+    assert "# 東京競馬場 第1R" in report_paths[0].read_text(encoding="utf-8")
 
 
 def test_show_features_script_runs_and_displays_latest_features(tmp_path: Path):

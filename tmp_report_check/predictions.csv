@@ -1,0 +1,4 @@
+﻿race_id,racecourse,race_number,race_name,horse_id,horse_name,prediction_score,predicted_label
+20250628-01,東京,1,東京メイプル賞,h1,サクラ,0.82,1
+20250628-01,東京,1,東京メイプル賞,h2,ヒカル,0.71,1
+20250628-01,東京,1,東京メイプル賞,h3,ミズキ,0.41,0

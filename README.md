@@ -44,5 +44,8 @@
 
 - 推論
   - `.\.venv\Scripts\python.exe -m keiba_ai_agent.predictor.predict dataset/dataset.csv --model-dir models --output predictions.csv`
+## AI予想レポート
 
+- 予測結果 CSV から Markdown レポートを生成
+  - `\.\.venv\Scripts\python.exe -c "from keiba_ai_agent.report import ReportBuilder; ReportBuilder(output_dir='reports').build_from_predictions('predictions.csv')"`
 詳細は [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) を参照してください。
