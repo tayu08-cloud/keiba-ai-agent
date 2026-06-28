@@ -3,6 +3,8 @@ import sys
 from pathlib import Path
 from unittest.mock import Mock
 
+import pytest
+
 from keiba_ai_agent.collector.jvlink_read_test import run_read_loop
 from keiba_ai_agent.database import (
     KeibaDatabase,
@@ -258,6 +260,90 @@ def test_show_horses_script_runs_with_default_db_path(tmp_path: Path):
 
     assert result.returncode == 0
     assert "テスト馬" in result.stdout
+
+
+def test_dataset_builder_creates_one_row_per_horse_and_saves_outputs(tmp_path: Path):
+    pytest.importorskip("pandas")
+    from keiba_ai_agent.dataset.dataset_builder import DatasetBuilder
+
+    db_path = tmp_path / "keiba.db"
+    database = KeibaDatabase(db_path=db_path)
+    horse_repo = HorseRepository(database)
+    horse_repo.upsert_horse_from_model(Horse(horse_name="サクラ", horse_id="horse-1"))
+
+    builder = FeatureBuilder(database_path=db_path)
+    builder.save_features_for_horses()
+
+    dataset_builder = DatasetBuilder(database_path=db_path, output_dir=tmp_path / "dataset")
+    dataframe = dataset_builder.build_dataset()
+    output_paths = dataset_builder.save_dataset()
+
+    assert dataframe.shape[0] == 1
+    assert "horse_name_length" in dataframe.columns
+    assert dataframe.loc[0, "horse_name_length"] == 3
+    assert (tmp_path / "dataset" / "dataset.csv").exists()
+    assert (tmp_path / "dataset" / "dataset.parquet").exists()
+    assert output_paths["csv"].exists()
+    assert output_paths["parquet"].exists()
+
+
+def test_build_dataset_script_runs(tmp_path: Path):
+    pytest.importorskip("pandas")
+
+    db_path = tmp_path / "keiba.db"
+    database = KeibaDatabase(db_path=db_path)
+    horse_repo = HorseRepository(database)
+    horse_repo.upsert_horse_from_model(Horse(horse_name="テスト馬", horse_id="horse-test"))
+
+    builder = FeatureBuilder(database_path=db_path)
+    builder.save_features_for_horses()
+
+    env = dict(__import__("os").environ)
+    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1])
+
+    result = subprocess.run(
+        [sys.executable, "scripts/build_dataset.py", str(db_path), str(tmp_path / "dataset")],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "Saved dataset" in result.stdout
+
+
+def test_show_features_script_runs_and_displays_latest_features(tmp_path: Path):
+    db_path = tmp_path / "keiba.db"
+    database = KeibaDatabase(db_path=db_path)
+    with database.connect() as connection:
+        connection.execute(
+            "INSERT INTO features (feature_id, feature_name, feature_value, source) VALUES (?, ?, ?, ?)",
+            ("horse-1:horse_name_length", "horse_name_length", 3, "horse"),
+        )
+        connection.execute(
+            "INSERT INTO features (feature_id, feature_name, feature_value, source) VALUES (?, ?, ?, ?)",
+            ("horse-1:has_horse_id", "has_horse_id", 1, "horse"),
+        )
+        connection.commit()
+
+    env = dict(__import__("os").environ)
+    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1])
+
+    result = subprocess.run(
+        [sys.executable, "scripts/show_features.py", str(db_path)],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "horse_id=horse-1" in result.stdout
+    assert "feature_name=horse_name_length" in result.stdout
+    assert "feature_value=3" in result.stdout
 
 
 def test_show_record_types_script_reports_counts(tmp_path: Path):
